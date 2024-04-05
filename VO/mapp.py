@@ -25,13 +25,16 @@ class Point(object):
         return add_ones(self.pt)
 
 class Frame(object):
-    def __init__(self, mapp, image, K, pose=np.eye(4), tid=None):    #for every frame , we have (img, K, pose, frontend, (kps, desc) from frontend obj, pts, id)
+    def __init__(self, mapp, image, K, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys, pose=np.eye(4), tid=None):    #for every frame , we have (img, K, pose, frontend, (kps, desc) from frontend obj, pts, id)
         self.image = image
         self.K = K
         self.pose = pose
         self.frontend = VO_frontend()
-        self.kps, self.des = self.frontend.get_keypoints(image)   #(kps :  (N, 2), des: (N, 32))
-        self.pts = [None]*len(self.kps)   #list of all None of len = N
+        # self.kps, self.des = self.frontend.get_keypoints(image)   #(kps :  (N, 2), des: (N, 32))
+        # self.kps = cotracker_correspondences[correspondences_keys[idx]][0]    #have to fix this (bug)
+        self.kps = cotracker_kps[kps_keys[idx]]
+        # img2_pixel_coordinates = cotracker_correspondences[keys[idx - 1]][1]
+        self.pts = [None]*len(self.kps)   #list of all None of len = N (same as self.kps)
         self.id = mapp.add_frame(self)    # we add current frame to Map (by passing Frame object) and assign id incrementally as camera captures scene
         self.SE3 = None   #this is g2o SE3 instance
     @property

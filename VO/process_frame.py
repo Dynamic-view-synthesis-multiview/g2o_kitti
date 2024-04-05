@@ -107,27 +107,46 @@ class VO_frontend(object):
         Rt[:3, :3] = rot
         Rt[:3, 3] = trans.squeeze()
         return np.linalg.inv(Rt), E    #inverse becoz we need pose transfromation from second most recent frame to most recent frame
+    def get_pose_using_cotracker_correspondences(self, frame1, frame2, K, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys):   #here we find relative pose b/w 2 images
+        Rt = np.eye(4)
+        img1_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][0]   #idx -1 as we skipped first frame (no frame before that)
+        img2_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][1]
+        # img1_pixel_coordinates = cotracker_kps[kps_keys[idx - 1]]   
+        # img2_pixel_coordinates = cotracker_kps[kps_keys[idx]]
+        E, mask = cv2.findEssentialMat(img1_pixel_coordinates, img2_pixel_coordinates, K, cv2.RANSAC)    #get E matrix from kps matches using RANSAC
+        traingulated_pnts, rot, trans, mask = cv2.recoverPose(E, img1_pixel_coordinates, img2_pixel_coordinates, K)   #get (R, t) from cv2.recoverPose (here we need E, K, matches kps)
+        # first arg is 3d points, [inf is hardcoded as 50], any points beyond 50 will not be considered for Rt estimation (we need to change this)
+        Rt[:3, :3] = rot
+        Rt[:3, 3] = trans.squeeze()
+        return np.linalg.inv(Rt), E    #inverse becoz we need pose transfromation from second most recent frame to most recent frame
+    
     def add_ones(self, x):
         if len(x.shape) == 1:
             return np.concatenate([x,np.array([1.0])], axis=0)
         else:
             return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
-    def get_triangulation(self, image1, idx1, image2, idx2):
-        # print("$$$$$ TRIANGULATION $$$$$")
-        # print("Pose of image 2 : ")
-        # print(image2.pose)
-        # print("Image 2 keypoints : ")
-        # print(image2.kps[idx2].T)
-        # print("Pose of image 1 : ")
-        # print(image1.pose)
-        # print("Image 1 keypoints : ")
-        # print(image1.kps[idx1].T)
-        # print("$$$$$ TRIANGULATION $$$$$")
-        # print(self.add_ones(image1.kps[idx1]).T)
-        kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(image1.kps[idx1]).T)
-        # print(kps1_normalized)
-        # print(kps1_normalized[:2])
-        kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(image2.kps[idx2]).T)
+    def get_triangulation(self, image1, idx1, image2, idx2, cotracker_correspondences, idx, keys):        
+        # kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(image1.kps[idx1]).T)
+        # # print(kps1_normalized)
+        # # print(kps1_normalized[:2])
+        # kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(image2.kps[idx2]).T)
+        img1_pixel_coordinates = cotracker_correspondences[keys[idx - 1]][0]
+        img2_pixel_coordinates = cotracker_correspondences[keys[idx - 1]][1]
+        kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(img1_pixel_coordinates).T)
+        kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(img2_pixel_coordinates).T)    
+        pts_4d = cv2.triangulatePoints(image1.pose[:3, :], image2.pose[:3, :],
+                                       kps1_normalized[:2], kps2_normalized[:2])
+        return pts_4d.T
+    
+    def get_triangulation_cotracker(self, image1, image2, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys):
+        # kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(image1.kps[idx1]).T)
+        # # print(kps1_normalized)
+        # # print(kps1_normalized[:2])
+        # kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(image2.kps[idx2]).T)
+        img1_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][0]
+        img2_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][1]
+        kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(img1_pixel_coordinates).T)
+        kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(img2_pixel_coordinates).T)    
         pts_4d = cv2.triangulatePoints(image1.pose[:3, :], image2.pose[:3, :],
                                        kps1_normalized[:2], kps2_normalized[:2])
         return pts_4d.T
