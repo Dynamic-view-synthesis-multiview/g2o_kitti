@@ -6,7 +6,7 @@ from process_frame import VO_frontend
 from display import Display3D
 
 
-def process_frame(image, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys, pose=None, verts=None):    #Note: We consider frame of first frame as world frame when starting VO
+def process_frame(image, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys, cotracker_correspondence_kps_indices, correspondence_kps_indices_keys, pose=None, verts=None):    #Note: We consider frame of first frame as world frame when starting VO
     frame = Frame(mapp, image, K, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys)   #mapp is Map object which has frames (Frame instances) and points as attributes, we also add current Frame instance in Map i.e mapp
     print()
     print("******** Frame %d *********" % frame.id)
@@ -52,7 +52,7 @@ def process_frame(image, cotracker_correspondences, cotracker_kps, idx, correspo
         # Project 3D points onto image planes and calculate reprojection errors
         pp1 = np.dot(frame1.K, pl1[:3])  
         pp2 = np.dot(frame2.K, pl2[:3])
-        img1_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][0]
+        img1_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][0]  #should have same no as pts3d
         img2_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][1]
         # pp1 = (pp1[0:2] / pp1[2]) - frame1.kps[idx1[i]]
         pp1 = (pp1[0:2] / pp1[2]) - img1_pixel_coordinates[i]
@@ -80,11 +80,11 @@ def process_frame(image, cotracker_correspondences, cotracker_kps, idx, correspo
         #     pt.add_observation(frame1, idx1[i])
         #     bool_pts1 = True
         
-        if frame2.pts[i] is None:    #Note that current point (didnt get filtered) will now be visible from frame 1 and frame2
-            pt.add_observation(frame2, i)
+        if frame2.pts[cotracker_correspondence_kps_indices[correspondence_kps_indices_keys[idx-1]][0][i]] is None:    #Note that current point (didnt get filtered) will now be visible from frame 1 and frame2
+            pt.add_observation(frame2, cotracker_correspondence_kps_indices[correspondence_kps_indices_keys[idx-1]][0][i])
             bool_pts2 = True
-        if frame1.pts[i] is None:
-            pt.add_observation(frame1, i)
+        if frame1.pts[cotracker_correspondence_kps_indices[correspondence_kps_indices_keys[idx-1]][1][i]] is None:
+            pt.add_observation(frame1, cotracker_correspondence_kps_indices[correspondence_kps_indices_keys[idx-1]][1][i])
             bool_pts1 = True
             
         # If both bool_pts1 and bool_pts2 are True, increment the new_pts_count  (how is this helpful?)
@@ -127,6 +127,9 @@ kps_keys = list(cotracker_kps.keys())   #[arr_0 - arr_139]   (one extra as we do
 # cotracker_kps['arr_0'].shape  :  (1000, 2)
 # cotracker_kps['arr_139'].shape  :  (3000, 2)
 
+cotracker_correspondence_kps_indices = np.load('/home2/jayaram.reddy/research_threads/dynamic_nerf_reconstruction/co-tracker/kps_matches_indices.npz')
+correspondence_kps_indices_keys = list(cotracker_correspondence_kps_indices.keys())   #[arr_0 - arr_139]   (one extra as we do for first 140 frames)
+# shape: (2, _)
 
 # do it for only for 130 images 
 for idx, path in enumerate(img_paths):  #144 images for kitti
@@ -137,10 +140,23 @@ for idx, path in enumerate(img_paths):  #144 images for kitti
         # x, y, z = process_frame(img)
         
         # cotracker_correspondences[idx] will have correspondences b/w images[idx] and images[idx+1]
-        x, y, z = process_frame(img, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys)
+        frames = []
+        x, y, z = process_frame(img, cotracker_correspondences, cotracker_kps, idx, correspondences_keys, kps_keys, cotracker_correspondence_kps_indices, correspondence_kps_indices_keys)
         if disp3d is not None:
             disp3d.paint(mapp)
-        
+
+
+poses_array = np.array([np.linalg.inv(f.pose) for f in mapp.frames])
+pts_array = np.array([p.pt for p in mapp.points])
+colors_array = np.array([p.color for p in mapp.points])
+# Reshape colors_array if needed
+colors_array = np.expand_dims(colors_array / 256.0, axis=-1)
+
+# Save poses_array to a .npy file
+np.save('cotracker_g2o_poses.npy', poses_array)
+# Save pts_array to a .npy file
+np.save('cotracker_g2o_points.npy', pts_array)
+np.save('cotracker_g2o_colors.npy', colors_array)
        
 # we need to get static and dynamic scene reconstruction  
 # 1.) For poses, we apply masks and estimate poses using static parts (static reconstruction )

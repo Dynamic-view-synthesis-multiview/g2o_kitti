@@ -40,7 +40,7 @@ class Display3D(object):
   def viewer_refresh(self, q):
     while not q.empty():
       self.state = q.get()
-      np.save("traj_full_with_color_images_g2o", self.state)
+      # np.save("traj_full_with_color_images_g2o", self.state)
 
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
     gl.glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -80,3 +80,4 @@ class Display3D(object):
       colors.append(p.color)
     # print(np.array(poses), np.array(pts).shape, np.expand_dims(np.array(colors)/256.0, axis=-1).shape)
     self.q.put((np.array(poses), np.array(pts), np.expand_dims(np.array(colors)/256.0, axis=-1)))
+

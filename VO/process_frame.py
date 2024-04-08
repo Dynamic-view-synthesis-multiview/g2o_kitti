@@ -147,7 +147,7 @@ class VO_frontend(object):
         img2_pixel_coordinates = cotracker_correspondences[correspondences_keys[idx - 1]][1]
         kps1_normalized = np.dot(np.linalg.inv(image1.K), self.add_ones(img1_pixel_coordinates).T)
         kps2_normalized = np.dot(np.linalg.inv(image2.K), self.add_ones(img2_pixel_coordinates).T)    
-        pts_4d = cv2.triangulatePoints(image1.pose[:3, :], image2.pose[:3, :],
+        pts_4d = cv2.triangulatePoints(image1.pose[:3, :], image2.pose[:3, :],   #we get in world frame
                                        kps1_normalized[:2], kps2_normalized[:2])
         return pts_4d.T
     # def get_matches(self, image1, image2):
